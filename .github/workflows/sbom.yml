@@ -1,0 +1,28 @@
+name: Kura SBOM upload
+
+on:
+  schedule:
+    # At 00:00 on Sunday
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+    inputs:
+        target_branch:
+          type: string
+          default: 'develop'
+          required: true
+  workflow_run:
+    workflows: ["Release Notes automation"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  call-workflow-in-public-repo:
+    uses: eclipse-kura/.github/.github/workflows/_shared-sbom-cyclonedx.yml@main
+    with:
+      # UUID of the kura-s7 project on the Eclipse Dependency-Track instance.
+      # Every repository has its own, see for instance kura-camel or kura-gpio.
+      dependency-track-id: 'CHANGEME'
