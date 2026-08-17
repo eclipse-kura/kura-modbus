@@ -69,8 +69,7 @@ Test-Cases: ${classes;CONCRETE;PUBLIC;NAMED;*Test}
 	osgi.identity;filter:='(osgi.identity=org.eclipse.kura.cloudconnection.kapua.mqtt.provider)',\
 	osgi.identity;filter:='(osgi.identity=org.eclipse.kura.db.h2db.provider)',\
 
-# Require the bundle under test, the Kura ConnectionFactory provider it
-# depends on, and the testing bundle
+# Require testing bundle
 -runrequires: \
     osgi.identity;filter:='(osgi.identity=org.eclipse.kura.protocol.modbus)',\
     osgi.identity;filter:='(osgi.identity=org.eclipse.kura.core.comm)',\

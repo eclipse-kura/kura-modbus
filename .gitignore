@@ -13,9 +13,6 @@ RemoteSystemsTempFiles
 .flattened-pom.xml
 .tycho-consumer-pom.xml
 lib/
-# NOTE: OSGI-INF is *not* ignored here: this project keeps its Declarative
-# Services descriptors in source control, bnd writes the generated ones
-# under target/.
 generated/
 bin/
 .eclipse/
