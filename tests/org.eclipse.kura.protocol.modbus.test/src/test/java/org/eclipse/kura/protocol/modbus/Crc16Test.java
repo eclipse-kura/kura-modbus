@@ -22,44 +22,94 @@ public class Crc16Test {
     private static final int SEED = 0x0ffff;
 
     @Test
-    public void shouldComputeTheCrcOfAKnownReadHoldingRegistersRequest() {
-        // 01 03 00 00 00 01 is answered with the CRC bytes 84 0A, low byte first
-        byte[] request = { 0x01, 0x03, 0x00, 0x00, 0x00, 0x01 };
+    public void shouldComputeTheCrcOfAReadHoldingRegistersRequest() {
+        givenBuffer(0x01, 0x03, 0x00, 0x00, 0x00, 0x01);
 
-        assertEquals(0x0A84, Crc16.getCrc16(request, request.length, SEED));
+        whenTheCrcIsComputed();
+
+        thenTheCrcIs(0x0A84);
     }
 
     @Test
-    public void shouldComputeTheCrcOfAKnownReadCoilsRequest() {
-        // 01 01 00 00 00 01 is answered with the CRC bytes FD CA, low byte first
-        byte[] request = { 0x01, 0x01, 0x00, 0x00, 0x00, 0x01 };
+    public void shouldComputeTheCrcOfAReadCoilsRequest() {
+        givenBuffer(0x01, 0x01, 0x00, 0x00, 0x00, 0x01);
 
-        assertEquals(0xCAFD, Crc16.getCrc16(request, request.length, SEED));
+        whenTheCrcIsComputed();
+
+        thenTheCrcIs(0xCAFD);
     }
 
     @Test
-    public void shouldYieldZeroOverAFrameThatCarriesItsOwnCrc() {
-        byte[] request = { 0x01, 0x03, 0x00, 0x00, 0x00, 0x01 };
-        int crc = Crc16.getCrc16(request, request.length, SEED);
+    public void shouldNotReportAnErrorOnAFrameThatCarriesItsOwnCrc() {
+        givenBuffer(0x01, 0x03, 0x00, 0x00, 0x00, 0x01);
+        givenTheCrcIsAppendedToTheBuffer();
 
-        byte[] frame = new byte[request.length + 2];
-        System.arraycopy(request, 0, frame, 0, request.length);
-        frame[request.length] = (byte) crc;
-        frame[request.length + 1] = (byte) (crc >> 8);
+        whenTheCrcIsComputed();
 
-        assertEquals(0, Crc16.getCrc16(frame, frame.length, SEED));
+        thenTheCrcIs(0);
     }
 
     @Test
     public void shouldReturnTheSeedForAnEmptyBuffer() {
-        assertEquals(SEED, Crc16.getCrc16(new byte[0], 0, SEED));
+        givenBuffer();
+
+        whenTheCrcIsComputed();
+
+        thenTheCrcIs(SEED);
     }
 
     @Test
     public void shouldOnlyConsiderTheRequestedNumberOfBytes() {
-        byte[] shortBuffer = { 0x01, 0x03 };
-        byte[] longBuffer = { 0x01, 0x03, 0x7f, 0x7f };
+        givenBuffer(0x01, 0x03, 0x7f, 0x7f);
+        givenOnlyTheFirstBytesAreConsidered(2);
 
-        assertEquals(Crc16.getCrc16(shortBuffer, 2, SEED), Crc16.getCrc16(longBuffer, 2, SEED));
+        whenTheCrcIsComputed();
+
+        thenTheCrcIsTheSameAsForTheBuffer(0x01, 0x03);
+    }
+
+    private byte[] buffer;
+    private int length;
+    private int crc;
+
+    private void givenBuffer(int... bytes) {
+        this.buffer = new byte[bytes.length];
+        for (int i = 0; i < bytes.length; i++) {
+            this.buffer[i] = (byte) bytes[i];
+        }
+        this.length = bytes.length;
+    }
+
+    private void givenTheCrcIsAppendedToTheBuffer() {
+        int computed = Crc16.getCrc16(this.buffer, this.length, SEED);
+
+        byte[] frame = new byte[this.length + 2];
+        System.arraycopy(this.buffer, 0, frame, 0, this.length);
+        frame[this.length] = (byte) computed;
+        frame[this.length + 1] = (byte) (computed >> 8);
+
+        this.buffer = frame;
+        this.length = frame.length;
+    }
+
+    private void givenOnlyTheFirstBytesAreConsidered(int count) {
+        this.length = count;
+    }
+
+    private void whenTheCrcIsComputed() {
+        this.crc = Crc16.getCrc16(this.buffer, this.length, SEED);
+    }
+
+    private void thenTheCrcIs(int expected) {
+        assertEquals(expected, this.crc);
+    }
+
+    private void thenTheCrcIsTheSameAsForTheBuffer(int... bytes) {
+        byte[] other = new byte[bytes.length];
+        for (int i = 0; i < bytes.length; i++) {
+            other[i] = (byte) bytes[i];
+        }
+
+        assertEquals(Crc16.getCrc16(other, other.length, SEED), this.crc);
     }
 }

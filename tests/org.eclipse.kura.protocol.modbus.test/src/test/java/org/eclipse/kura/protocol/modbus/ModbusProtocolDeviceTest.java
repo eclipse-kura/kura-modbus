@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2017, 2020 Eurotech and/or its affiliates and others
+ * Copyright (c) 2017, 2026 Eurotech and/or its affiliates and others
  * 
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
@@ -13,8 +13,9 @@
 
 package org.eclipse.kura.protocol.modbus;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -23,24 +24,119 @@ import org.eclipse.kura.KuraConnectionStatus;
 import org.eclipse.kura.protocol.modbus.test.ModbusServer;
 import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Feature: exchanging Modbus messages with a slave over Modbus TCP. The failure
+ * paths of the same transport are covered by {@link TcpTransactionFailureTest}.
+ */
 public class ModbusProtocolDeviceTest {
+
+    @Test
+    public void shouldReportTheConnectionAsEstablished() {
+        givenAConnectedDevice();
+
+        whenTheConnectionStatusIsRead();
+
+        thenTheReadStatusIs(KuraConnectionStatus.CONNECTED);
+    }
+
+    @Test
+    public void shouldReadACoil() {
+        givenAConnectedDevice();
+
+        whenCoilsAreRead(0, 1);
+
+        thenNoFailureIsReported();
+        thenTheReadBooleansAre(true);
+    }
+
+    @Test
+    public void shouldReadDiscreteInputs() {
+        givenAConnectedDevice();
+
+        whenDiscreteInputsAreRead(1, 4);
+
+        thenNoFailureIsReported();
+        thenTheReadBooleansAre(true, true, true, true);
+    }
+
+    @Test
+    public void shouldReadAHoldingRegister() {
+        givenAConnectedDevice();
+
+        whenHoldingRegistersAreRead(0, 1);
+
+        thenNoFailureIsReported();
+        thenTheReadRegistersAre(2);
+    }
+
+    @Test
+    public void shouldReadAnInputRegister() {
+        givenAConnectedDevice();
+
+        whenInputRegistersAreRead(8, 1);
+
+        thenNoFailureIsReported();
+        thenTheReadRegistersAre(10);
+    }
+
+    @Test
+    public void shouldWriteASingleCoil() {
+        givenAConnectedDevice();
+
+        whenASingleCoilIsWritten(0, true);
+
+        thenNoFailureIsReported();
+    }
+
+    @Test
+    public void shouldWriteMultipleCoils() {
+        givenAConnectedDevice();
+
+        whenMultipleCoilsAreWritten(1, true, false, true, true, false);
+
+        thenNoFailureIsReported();
+    }
+
+    @Test
+    public void shouldWriteASingleRegister() {
+        givenAConnectedDevice();
+
+        whenASingleRegisterIsWritten(0, 37);
+
+        thenNoFailureIsReported();
+    }
+
+    @Test
+    public void shouldWriteMultipleRegisters() {
+        givenAConnectedDevice();
+
+        whenMultipleRegistersAreWritten(0, 12, 24, 46, 58);
+
+        thenNoFailureIsReported();
+    }
 
     private static final Logger logger = LoggerFactory.getLogger(ModbusProtocolDeviceTest.class);
 
+    private static final int PORT = 32345;
+    private static final int UNIT = 1;
+
     private static ModbusServer modbusServer;
 
-    private ModbusProtocolDevice modbusDevice;
+    private ModbusProtocolDevice device;
+    private ModbusProtocolException failure;
+    private boolean[] readBooleans;
+    private int[] readRegisters;
+    private int connectionStatus;
 
     @BeforeClass
     public static void startServer() throws Exception {
         modbusServer = new ModbusServer();
-        modbusServer.start(32345);
+        modbusServer.start(PORT);
         logger.info("MODBUS server started");
     }
 
@@ -50,83 +146,111 @@ public class ModbusProtocolDeviceTest {
         logger.info("MODBUS server stopped");
     }
 
-    @Before
-    public void connect() throws ModbusProtocolException {
-        modbusDevice = new ModbusProtocolDevice();
+    @After
+    public void disconnect() throws ModbusProtocolException {
+        this.device.disconnect();
+    }
+
+    private void givenAConnectedDevice() {
         Properties connectionConfig = new Properties();
         connectionConfig.setProperty("connectionType", ModbusProtocolDevice.PROTOCOL_CONNECTION_TYPE_ETHER_TCP);
         connectionConfig.setProperty("ipAddress", "127.0.0.1");
-        connectionConfig.setProperty("ethport", "32345");
+        connectionConfig.setProperty("ethport", Integer.toString(PORT));
         connectionConfig.setProperty("respTimeout", "10000");
         connectionConfig.setProperty("transmissionMode", ModbusTransmissionMode.RTU);
-        modbusDevice.configureConnection(connectionConfig);
-        modbusDevice.connect();
+
+        this.device = new ModbusProtocolDevice();
+        try {
+            this.device.configureConnection(connectionConfig);
+            this.device.connect();
+        } catch (ModbusProtocolException e) {
+            fail("the connection could not be opened: " + e.getMessage());
+        }
     }
 
-    @After
-    public void disconnect() throws ModbusProtocolException {
-        modbusDevice.disconnect();
+    private void whenTheConnectionStatusIsRead() {
+        this.connectionStatus = this.device.getConnectStatus();
     }
 
-    @Test
-    public void testGetConnectStatus() throws ModbusProtocolException {
-        int connectStatus = modbusDevice.getConnectStatus();
-        assertEquals(KuraConnectionStatus.CONNECTED, connectStatus);
+    private void whenCoilsAreRead(int dataAddress, int count) {
+        try {
+            this.readBooleans = this.device.readCoils(UNIT, dataAddress, count);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testReadCoils() throws ModbusProtocolException {
-        boolean[] coils = modbusDevice.readCoils(1, 0, 1);
-        assertEquals(1, coils.length);
-        assertTrue(coils[0]);
+    private void whenDiscreteInputsAreRead(int dataAddress, int count) {
+        try {
+            this.readBooleans = this.device.readDiscreteInputs(UNIT, dataAddress, count);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testWriteSingleCoil() throws ModbusProtocolException {
-        modbusDevice.writeSingleCoil(1, 0, true);
-        assertTrue("No exception", true);
+    private void whenHoldingRegistersAreRead(int dataAddress, int count) {
+        try {
+            this.readRegisters = this.device.readHoldingRegisters(UNIT, dataAddress, count);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testWriteMultipleCoils() throws ModbusProtocolException {
-        modbusDevice.writeMultipleCoils(1, 1, new boolean[] { true, false, true, true, false });
-        assertTrue("No exception", true);
+    private void whenInputRegistersAreRead(int dataAddress, int count) {
+        try {
+            this.readRegisters = this.device.readInputRegisters(UNIT, dataAddress, count);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testReadHoldingRegisters() throws ModbusProtocolException {
-        int[] holdingReg = modbusDevice.readHoldingRegisters(1, 0, 1);
-        assertEquals(1, holdingReg.length);
-        assertEquals(2, holdingReg[0]);
+    private void whenASingleCoilIsWritten(int dataAddress, boolean value) {
+        try {
+            this.device.writeSingleCoil(UNIT, dataAddress, value);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testWriteSingleRegister() throws ModbusProtocolException {
-        modbusDevice.writeSingleRegister(1, 0, 37);
-        assertTrue("No exception", true);
+    private void whenMultipleCoilsAreWritten(int dataAddress, boolean... values) {
+        try {
+            this.device.writeMultipleCoils(UNIT, dataAddress, values);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testWriteMultipleRegister() throws ModbusProtocolException {
-        modbusDevice.writeMultipleRegister(1, 0, new int[] { 12, 24, 46, 58 });
-        assertTrue("No exception", true);
+    private void whenASingleRegisterIsWritten(int dataAddress, int value) {
+        try {
+            this.device.writeSingleRegister(UNIT, dataAddress, value);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testReadDiscreteInputs() throws ModbusProtocolException {
-        boolean[] discreteInputs = modbusDevice.readDiscreteInputs(1, 1, 4);
-        assertEquals(4, discreteInputs.length);
-        assertTrue(discreteInputs[0]);
-        assertTrue(discreteInputs[1]);
-        assertTrue(discreteInputs[2]);
-        assertTrue(discreteInputs[3]);
+    private void whenMultipleRegistersAreWritten(int dataAddress, int... values) {
+        try {
+            this.device.writeMultipleRegister(UNIT, dataAddress, values);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
     }
 
-    @Test
-    public void testReadInputRegisters() throws ModbusProtocolException {
-        int[] inputRegs = modbusDevice.readInputRegisters(1, 8, 1);
-        assertEquals(inputRegs.length, 1);
-        assertEquals(10, inputRegs[0]);
+    private void thenNoFailureIsReported() {
+        if (this.failure != null) {
+            fail("unexpected failure: " + this.failure.getMessage());
+        }
     }
 
+    private void thenTheReadStatusIs(int expected) {
+        assertEquals(expected, this.connectionStatus);
+    }
+
+    private void thenTheReadBooleansAre(boolean... expected) {
+        assertArrayEquals(expected, this.readBooleans);
+    }
+
+    private void thenTheReadRegistersAre(int... expected) {
+        assertArrayEquals(expected, this.readRegisters);
+    }
 }

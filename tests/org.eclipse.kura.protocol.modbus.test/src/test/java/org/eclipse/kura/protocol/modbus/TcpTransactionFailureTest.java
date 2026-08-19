@@ -1,0 +1,289 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Eurotech and/or its affiliates and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *  Eurotech
+ ******************************************************************************/
+
+package org.eclipse.kura.protocol.modbus;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.IOException;
+import java.util.Properties;
+
+import org.eclipse.kura.KuraConnectionStatus;
+import org.eclipse.kura.protocol.modbus.test.ScriptedTcpServer;
+import org.eclipse.kura.protocol.modbus.test.ScriptedTcpServer.Behaviour;
+import org.junit.After;
+import org.junit.Test;
+
+/**
+ * Feature: how a Modbus TCP transaction fails. The happy paths of the same
+ * transport are covered by {@link ModbusProtocolDeviceTest}.
+ */
+public class TcpTransactionFailureTest {
+
+    @Test
+    public void shouldRefuseAsciiOverTcp() {
+        givenAPeerThatStaysSilent();
+        givenTheTransmissionMode(ModbusTransmissionMode.ASCII);
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.METHOD_NOT_SUPPORTED);
+        thenTheFailureMentions("Only RTU over TCP/IP supported");
+    }
+
+    @Test
+    public void shouldFailWhenNothingIsListening() {
+        givenNoPeerAtAll();
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheConnectionStatusIs(KuraConnectionStatus.DISCONNECTED);
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+        thenTheFailureMentions("closed socket");
+    }
+
+    @Test
+    public void shouldFailWhenThePeerHangsUp() {
+        givenAPeerThatHangsUp();
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+    }
+
+    @Test
+    public void shouldTimeOutWhenThePeerStaysSilent() {
+        givenAPeerThatStaysSilent();
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+        thenTheFailureMentions("Recv timeout");
+    }
+
+    @Test
+    public void shouldRejectAResponseFromTheWrongUnit() {
+        givenAPeerThatAnswersWith(0, 1, 0, 0, 0, 4, 2, 3, 2, 0, 1);
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+        thenTheFailureMentions("incorrect modbus id");
+    }
+
+    @Test
+    public void shouldRejectAResponseForTheWrongFunction() {
+        givenAPeerThatAnswersWith(0, 1, 0, 0, 0, 4, 1, 4, 2, 0, 1);
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+        thenTheFailureMentions("incorrect function number");
+    }
+
+    @Test
+    public void shouldReportAnErrorResponse() {
+        givenAPeerThatAnswersWith(0, 1, 0, 0, 0, 3, 1, 0x83, 2);
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+        thenTheFailureMentions("Modbus responds an error");
+    }
+
+    @Test
+    public void shouldRejectAResponseCarryingTheWrongAmountOfData() {
+        givenAPeerThatAnswersWith(0, 1, 0, 0, 0, 3, 1, 3, 1, 0);
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_DATA_ADDRESS);
+    }
+
+    @Test
+    public void shouldRejectTheAnswerToAReadExceptionStatus() {
+        givenAPeerThatAnswersWith(0, 1, 0, 0, 0, 4, 1, 7, 1, 0xAA);
+        givenAnOpenConnection();
+
+        whenTheExceptionStatusIsRead();
+
+        // the driver never learnt to parse the answers of functions 7, 11 and 12
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_DATA_TYPE);
+    }
+
+    @Test
+    public void shouldRejectTheAnswerToAGetCommEventCounter() {
+        givenAPeerThatAnswersWith(0, 1, 0, 0, 0, 4, 1, 11, 1, 0xAA);
+        givenAnOpenConnection();
+
+        whenTheCommEventCounterIsRead();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_DATA_TYPE);
+    }
+
+    @Test
+    public void shouldRejectTheAnswerToAGetCommEventLog() {
+        givenAPeerThatAnswersWith(0, 1, 0, 0, 0, 4, 1, 12, 1, 0xAA);
+        givenAnOpenConnection();
+
+        whenTheCommEventLogIsRead();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_DATA_TYPE);
+    }
+
+    @Test
+    public void shouldNotCompleteATransactionInRtuOverTcpMode() {
+        givenAPeerThatStaysSilent();
+        givenTheConnectionType(ModbusProtocolDevice.PROTOCOL_CONNECTION_TYPE_ETHER_RTU);
+        givenAnOpenConnection();
+
+        whenHoldingRegistersAreRead(1);
+
+        // RTU over TCP carries no frame delimiter here, so the read can only time out
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+    }
+
+    private static final int UNIT = 1;
+
+    private ScriptedTcpServer server;
+    private int port;
+    private String connectionType = ModbusProtocolDevice.PROTOCOL_CONNECTION_TYPE_ETHER_TCP;
+    private String transmissionMode = ModbusTransmissionMode.RTU;
+    private ModbusProtocolDevice device;
+    private ModbusProtocolException failure;
+
+    @After
+    public void stopThePeer() throws IOException {
+        if (this.server != null) {
+            this.server.close();
+        }
+    }
+
+    private void givenAPeerThatAnswersWith(int... frame) {
+        byte[] response = new byte[frame.length];
+        for (int i = 0; i < frame.length; i++) {
+            response[i] = (byte) frame[i];
+        }
+        givenAPeer(Behaviour.RESPOND, response);
+    }
+
+    private void givenAPeerThatStaysSilent() {
+        givenAPeer(Behaviour.SILENT);
+    }
+
+    private void givenAPeerThatHangsUp() {
+        givenAPeer(Behaviour.CLOSE);
+    }
+
+    private void givenNoPeerAtAll() {
+        givenAPeer(Behaviour.CLOSE);
+        try {
+            // release the port so that the connection is refused
+            this.server.close();
+            this.server = null;
+        } catch (IOException e) {
+            fail("the peer could not be stopped: " + e.getMessage());
+        }
+    }
+
+    private void givenAPeer(Behaviour behaviour, byte... response) {
+        try {
+            this.server = new ScriptedTcpServer(behaviour, response);
+            this.port = this.server.getPort();
+        } catch (IOException e) {
+            fail("the peer could not be started: " + e.getMessage());
+        }
+    }
+
+    private void givenTheTransmissionMode(String mode) {
+        this.transmissionMode = mode;
+    }
+
+    private void givenTheConnectionType(String type) {
+        this.connectionType = type;
+    }
+
+    private void givenAnOpenConnection() {
+        Properties config = new Properties();
+        config.setProperty("connectionType", this.connectionType);
+        config.setProperty("transmissionMode", this.transmissionMode);
+        config.setProperty("respTimeout", "300");
+        config.setProperty("ipAddress", "127.0.0.1");
+        config.setProperty("ethport", Integer.toString(this.port));
+
+        this.device = new ModbusProtocolDevice();
+        try {
+            this.device.configureConnection(config);
+            this.device.connect();
+        } catch (ModbusProtocolException e) {
+            fail("the connection could not be configured: " + e.getMessage());
+        }
+    }
+
+    private void whenHoldingRegistersAreRead(int count) {
+        try {
+            this.device.readHoldingRegisters(UNIT, 0, count);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
+    }
+
+    private void whenTheExceptionStatusIsRead() {
+        try {
+            this.device.readExceptionStatus(UNIT);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
+    }
+
+    private void whenTheCommEventCounterIsRead() {
+        try {
+            this.device.getCommEventCounter(UNIT);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
+    }
+
+    private void whenTheCommEventLogIsRead() {
+        try {
+            this.device.getCommEventLog(UNIT);
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
+    }
+
+    private void thenTheFailureCodeIs(ModbusProtocolErrorCode expected) {
+        assertNotNull("no failure was reported", this.failure);
+        assertEquals(expected, this.failure.getCode());
+    }
+
+    private void thenTheFailureMentions(String text) {
+        assertNotNull("no failure was reported", this.failure);
+        assertTrue(this.failure.getMessage().contains(text));
+    }
+
+    private void thenTheConnectionStatusIs(int expected) {
+        assertEquals(expected, this.device.getConnectStatus());
+    }
+}

@@ -1,0 +1,265 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Eurotech and/or its affiliates and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *  Eurotech
+ ******************************************************************************/
+
+package org.eclipse.kura.protocol.modbus;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+
+import org.eclipse.kura.KuraConnectionStatus;
+import org.junit.Test;
+
+/**
+ * Feature: opening and closing the serial port used by the Modbus driver.
+ */
+public class SerialConnectionTest extends AbstractSerialFeature {
+
+    @Test
+    public void shouldOpenThePortResolvedFromItsUsbAddress() {
+        givenAnRtuSlave();
+
+        whenTheConnectionIsConfigured();
+
+        thenNoFailureIsReported();
+        thenTheConnectionStatusIs(KuraConnectionStatus.CONNECTED);
+        thenThePortWasResolvedTo(DEVICE_NODE);
+    }
+
+    @Test
+    public void shouldClosethePortOnDisconnect() {
+        givenAnRtuSlave();
+        givenAnOpenConnection();
+
+        whenTheDeviceIsDisconnected();
+
+        thenNoFailureIsReported();
+        thenThePortWasClosed();
+        thenTheConnectionStatusIs(KuraConnectionStatus.NEVERCONNECTED);
+    }
+
+    @Test
+    public void shouldTolerateASecondDisconnect() {
+        givenAnRtuSlave();
+        givenAnOpenConnection();
+
+        whenTheDeviceIsDisconnectedTwice();
+
+        thenNoFailureIsReported();
+    }
+
+    @Test
+    public void shouldReportAPortThatCannotBeClosed() {
+        givenAnRtuSlave();
+        givenAnOpenConnection();
+        givenThePortCannotBeClosed();
+
+        whenTheDeviceIsDisconnected();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+    }
+
+    @Test
+    public void shouldSwallowAFailingDisconnectOnDeactivation() {
+        givenAnRtuSlave();
+        givenAnOpenConnection();
+        givenThePortCannotBeClosed();
+
+        whenTheComponentIsDeactivated();
+
+        thenNoFailureIsReported();
+    }
+
+    @Test
+    public void shouldRequireAPortName() {
+        givenAnRtuSlave();
+        givenTheConfigurationWithout("port");
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.NOT_AVAILABLE);
+    }
+
+    @Test
+    public void shouldRequireABaudRate() {
+        givenAnRtuSlave();
+        givenTheConfigurationWithout("baudRate");
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_CONFIGURATION);
+    }
+
+    @Test
+    public void shouldRequireANumberOfStopBits() {
+        givenAnRtuSlave();
+        givenTheConfigurationWithout("stopBits");
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_CONFIGURATION);
+    }
+
+    @Test
+    public void shouldRequireAParityMode() {
+        givenAnRtuSlave();
+        givenTheConfigurationWithout("parity");
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_CONFIGURATION);
+    }
+
+    @Test
+    public void shouldRequireAWordSize() {
+        givenAnRtuSlave();
+        givenTheConfigurationWithout("bitsPerWord");
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.INVALID_CONFIGURATION);
+    }
+
+    @Test
+    public void shouldRefuseAUsbPortThatIsNotListed() {
+        givenAnRtuSlave();
+        givenTheConfigurationProperty("port", "1-9.9");
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.NOT_AVAILABLE);
+    }
+
+    @Test
+    public void shouldRefuseADeviceNodeThatDoesNotExist() {
+        givenAnRtuSlave();
+        givenTheConfigurationProperty("port", "/dev/does-not-exist");
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.NOT_AVAILABLE);
+    }
+
+    @Test
+    public void shouldRefuseToConfigureWhenNoTtyDeviceIsListed() {
+        givenAnRtuSlave();
+        givenNoTtyDeviceIsListed();
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.NOT_AVAILABLE);
+    }
+
+    @Test
+    public void shouldReportAPortThatCannotBeOpened() {
+        givenAnRtuSlave();
+        givenThePortCannotBeOpened();
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.CONNECTION_FAILURE);
+    }
+
+    @Test
+    public void shouldReportStreamsThatCannotBeOpened() {
+        givenAnRtuSlave();
+        givenTheStreamsCannotBeOpened();
+
+        whenTheConnectionIsConfigured();
+
+        thenTheFailureCodeIs(ModbusProtocolErrorCode.CONNECTION_FAILURE);
+    }
+
+    @Test
+    public void shouldOpenThePortAfterTheServicesAreRebound() {
+        givenAnRtuSlave();
+        givenTheServicesAreUnboundAndBoundAgain();
+
+        whenTheConnectionIsConfigured();
+
+        thenNoFailureIsReported();
+        thenTheConnectionStatusIs(KuraConnectionStatus.CONNECTED);
+    }
+
+    private void givenThePortCannotBeClosed() {
+        try {
+            doThrow(new IOException("cannot close")).when(this.connection).close();
+        } catch (IOException e) {
+            fail("the mock could not be set up: " + e.getMessage());
+        }
+    }
+
+    private void givenThePortCannotBeOpened() {
+        try {
+            when(this.connectionFactory.createConnection(anyString(), anyInt(), anyBoolean()))
+                    .thenThrow(new IOException("no such port"));
+        } catch (IOException e) {
+            fail("the mock could not be set up: " + e.getMessage());
+        }
+    }
+
+    private void givenTheStreamsCannotBeOpened() {
+        try {
+            when(this.connection.openInputStream()).thenThrow(new IOException("no streams"));
+        } catch (IOException e) {
+            fail("the mock could not be set up: " + e.getMessage());
+        }
+    }
+
+    private void givenNoTtyDeviceIsListed() {
+        when(this.usbService.getUsbTtyDevices()).thenReturn(null);
+    }
+
+    private void givenTheServicesAreUnboundAndBoundAgain() {
+        this.device.unsetConnectionFactory(this.connectionFactory);
+        this.device.unsetUsbService(this.usbService);
+        this.device.setConnectionFactory(this.connectionFactory);
+        this.device.setUsbService(this.usbService);
+    }
+
+    private void whenTheDeviceIsDisconnected() {
+        try {
+            this.device.disconnect();
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
+    }
+
+    private void whenTheDeviceIsDisconnectedTwice() {
+        whenTheDeviceIsDisconnected();
+        whenTheDeviceIsDisconnected();
+    }
+
+    private void whenTheComponentIsDeactivated() {
+        this.device.deactivate(null);
+    }
+
+    private void thenThePortWasResolvedTo(String deviceNode) {
+        assertEquals(deviceNode, this.config.getProperty("port"));
+    }
+
+    private void thenThePortWasClosed() {
+        try {
+            verify(this.connection).close();
+        } catch (IOException e) {
+            fail("the verification failed: " + e.getMessage());
+        }
+    }
+}

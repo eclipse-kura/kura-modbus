@@ -13,6 +13,7 @@
 package org.eclipse.kura.protocol.modbus.integration;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 import java.util.Collection;
 import java.util.concurrent.CountDownLatch;
@@ -20,7 +21,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.kura.protocol.modbus.ModbusProtocolDeviceService;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -32,11 +32,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Verifies that the Modbus bundle resolves and activates in a real Kura
- * framework. The component has mandatory references to the OSGi
- * {@code ConnectionFactory} and to the Kura {@code UsbService}, so the service
- * only appears once both are wired: seeing it published is what proves the
- * bundle works once installed by the Debian package.
+ * Feature: the Modbus bundle resolves and activates in a real Kura framework.
+ * The component has mandatory references to the OSGi {@code ConnectionFactory}
+ * and to the Kura {@code UsbService}, so the service only appears once both are
+ * wired: seeing it published is what proves the bundle works once installed by
+ * the Debian package.
  *
  * The service is looked up through the {@link BundleContext} instead of being
  * injected with {@code @Reference}: the Kura bundles carry no
@@ -46,6 +46,15 @@ import org.slf4j.LoggerFactory;
 @Component(immediate = true)
 public class ModbusProtocolDeviceServiceItTest {
 
+    @Test
+    public void shouldPublishTheModbusProtocolDeviceService() {
+        givenAnActivatedTestComponent();
+
+        whenTheProtocolDeviceServiceIsLookedUp();
+
+        thenTheServiceIsPublished();
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(ModbusProtocolDeviceServiceItTest.class);
 
     private static final long TIMEOUT_SECONDS = 60;
@@ -54,21 +63,13 @@ public class ModbusProtocolDeviceServiceItTest {
 
     // needs to be static for being available to JUnit Runner
     private static BundleContext bundleContext;
-    private static ModbusProtocolDeviceService modbusService;
+
+    private ModbusProtocolDeviceService modbusService;
 
     @Activate
     public void activate(BundleContext context) {
         bundleContext = context;
         activated.countDown();
-    }
-
-    @BeforeClass
-    public static void lookupService() throws Exception {
-        if (!activated.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            throw new IllegalStateException("test component not activated in " + TIMEOUT_SECONDS + " seconds");
-        }
-
-        modbusService = awaitService(ModbusProtocolDeviceService.class);
     }
 
     @AfterClass
@@ -84,24 +85,44 @@ public class ModbusProtocolDeviceServiceItTest {
         }
     }
 
-    @Test
-    public void shouldPublishTheModbusProtocolDeviceService() {
-        assertNotNull(modbusService);
+    private void givenAnActivatedTestComponent() {
+        try {
+            if (!activated.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                fail("test component not activated in " + TIMEOUT_SECONDS + " seconds");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail("interrupted while waiting for the test component");
+        }
     }
 
-    private static <T> T awaitService(final Class<T> clazz) throws Exception {
+    private void whenTheProtocolDeviceServiceIsLookedUp() {
+        this.modbusService = awaitService(ModbusProtocolDeviceService.class);
+    }
+
+    private void thenTheServiceIsPublished() {
+        assertNotNull(this.modbusService);
+    }
+
+    private static <T> T awaitService(final Class<T> clazz) {
         final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
 
-        while (System.nanoTime() < deadline) {
-            final Collection<ServiceReference<T>> references = bundleContext.getServiceReferences(clazz, null);
-            if (!references.isEmpty()) {
-                return bundleContext.getService(references.iterator().next());
+        try {
+            while (System.nanoTime() < deadline) {
+                final Collection<ServiceReference<T>> references = bundleContext.getServiceReferences(clazz, null);
+                if (!references.isEmpty()) {
+                    return bundleContext.getService(references.iterator().next());
+                }
+                Thread.sleep(500);
             }
-            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail("interrupted while waiting for the " + clazz.getSimpleName() + " service");
+        } catch (Exception e) {
+            fail("the " + clazz.getSimpleName() + " service could not be looked up: " + e.getMessage());
         }
 
-        throw new IllegalStateException(
-                "no " + clazz.getSimpleName() + " service in " + TIMEOUT_SECONDS + " seconds");
+        return null;
     }
 
 }

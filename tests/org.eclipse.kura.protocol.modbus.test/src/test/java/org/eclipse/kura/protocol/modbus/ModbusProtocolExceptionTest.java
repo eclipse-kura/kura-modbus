@@ -19,6 +19,8 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.EnumMap;
+import java.util.Map;
 
 import org.junit.Test;
 
@@ -26,55 +28,106 @@ public class ModbusProtocolExceptionTest {
 
     @Test
     public void shouldReportTheCode() {
-        ModbusProtocolException exception = new ModbusProtocolException(ModbusProtocolErrorCode.NOT_CONNECTED);
+        whenAnExceptionIsBuiltWith(ModbusProtocolErrorCode.NOT_CONNECTED);
 
-        assertEquals(ModbusProtocolErrorCode.NOT_CONNECTED, exception.getCode());
-        assertNull(exception.getCause());
+        thenTheCodeIs(ModbusProtocolErrorCode.NOT_CONNECTED);
+        thenThereIsNoCause();
     }
 
     @Test
     public void shouldNameTheCodeInTheMessage() {
-        ModbusProtocolException exception = new ModbusProtocolException(
-                ModbusProtocolErrorCode.INVALID_CONFIGURATION);
+        whenAnExceptionIsBuiltWith(ModbusProtocolErrorCode.INVALID_CONFIGURATION);
 
-        assertTrue(exception.getMessage().contains("INVALID_CONFIGURATION"));
+        thenTheMessageMentions("INVALID_CONFIGURATION");
     }
 
     @Test
     public void shouldAppendTheComplementToTheMessage() {
-        ModbusProtocolException exception = new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
-                "Bad LRC");
+        whenAnExceptionIsBuiltWith(ModbusProtocolErrorCode.TRANSACTION_FAILURE, "Bad LRC");
 
-        assertEquals(ModbusProtocolErrorCode.TRANSACTION_FAILURE, exception.getCode());
-        assertTrue(exception.getMessage().endsWith("Bad LRC"));
+        thenTheCodeIs(ModbusProtocolErrorCode.TRANSACTION_FAILURE);
+        thenTheMessageEndsWith("Bad LRC");
     }
 
     @Test
     public void shouldRetainTheCause() {
-        IOException cause = new IOException("boom");
+        givenACause("boom");
 
-        ModbusProtocolException exception = new ModbusProtocolException(ModbusProtocolErrorCode.CONNECTION_FAILURE,
-                cause, "first", "second");
+        whenAnExceptionIsBuiltWithTheCause(ModbusProtocolErrorCode.CONNECTION_FAILURE, "first", "second");
 
-        assertSame(cause, exception.getCause());
-        assertEquals(ModbusProtocolErrorCode.CONNECTION_FAILURE, exception.getCode());
-        assertTrue(exception.getMessage().contains("CONNECTION_FAILURE"));
+        thenTheCodeIs(ModbusProtocolErrorCode.CONNECTION_FAILURE);
+        thenTheCauseIsReported();
+        thenTheMessageMentions("CONNECTION_FAILURE");
     }
 
     @Test
     public void shouldLocalizeUsingTheDefaultLocale() {
-        ModbusProtocolException exception = new ModbusProtocolException(ModbusProtocolErrorCode.RESPONSE_TIMEOUT);
+        whenAnExceptionIsBuiltWith(ModbusProtocolErrorCode.RESPONSE_TIMEOUT);
 
-        assertTrue(exception.getLocalizedMessage().contains("RESPONSE_TIMEOUT"));
+        thenTheLocalizedMessageMentions("RESPONSE_TIMEOUT");
     }
 
     @Test
-    public void shouldDefineAMessageCodeForEveryErrorCode() {
-        for (ModbusProtocolErrorCode code : ModbusProtocolErrorCode.values()) {
-            ModbusProtocolException exception = new ModbusProtocolException(code);
+    public void shouldNameEveryErrorCodeInItsOwnMessage() {
+        whenAnExceptionIsBuiltForEveryErrorCode();
 
-            assertTrue(exception.getMessage().contains(code.name()));
-            assertEquals(code, ModbusProtocolErrorCode.valueOf(code.name()));
+        thenEveryMessageMentionsItsOwnCode();
+    }
+
+    private ModbusProtocolException exception;
+    private IOException cause;
+    private final Map<ModbusProtocolErrorCode, String> messages = new EnumMap<>(ModbusProtocolErrorCode.class);
+
+    private void givenACause(String message) {
+        this.cause = new IOException(message);
+    }
+
+    private void whenAnExceptionIsBuiltWith(ModbusProtocolErrorCode code) {
+        this.exception = new ModbusProtocolException(code);
+    }
+
+    private void whenAnExceptionIsBuiltWith(ModbusProtocolErrorCode code, String complement) {
+        this.exception = new ModbusProtocolException(code, complement);
+    }
+
+    private void whenAnExceptionIsBuiltWithTheCause(ModbusProtocolErrorCode code, Object... arguments) {
+        this.exception = new ModbusProtocolException(code, this.cause, arguments);
+    }
+
+    private void whenAnExceptionIsBuiltForEveryErrorCode() {
+        for (ModbusProtocolErrorCode code : ModbusProtocolErrorCode.values()) {
+            this.messages.put(code, new ModbusProtocolException(code).getMessage());
+        }
+    }
+
+    private void thenTheCodeIs(ModbusProtocolErrorCode expected) {
+        assertEquals(expected, this.exception.getCode());
+    }
+
+    private void thenThereIsNoCause() {
+        assertNull(this.exception.getCause());
+    }
+
+    private void thenTheCauseIsReported() {
+        assertSame(this.cause, this.exception.getCause());
+    }
+
+    private void thenTheMessageMentions(String expected) {
+        assertTrue(this.exception.getMessage().contains(expected));
+    }
+
+    private void thenTheMessageEndsWith(String expected) {
+        assertTrue(this.exception.getMessage().endsWith(expected));
+    }
+
+    private void thenTheLocalizedMessageMentions(String expected) {
+        assertTrue(this.exception.getLocalizedMessage().contains(expected));
+    }
+
+    private void thenEveryMessageMentionsItsOwnCode() {
+        assertEquals(ModbusProtocolErrorCode.values().length, this.messages.size());
+        for (Map.Entry<ModbusProtocolErrorCode, String> entry : this.messages.entrySet()) {
+            assertTrue(entry.getValue().contains(entry.getKey().name()));
         }
     }
 }

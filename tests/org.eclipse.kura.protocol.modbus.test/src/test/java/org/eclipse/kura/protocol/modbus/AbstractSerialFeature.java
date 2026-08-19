@@ -1,0 +1,153 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Eurotech and/or its affiliates and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *  Eurotech
+ ******************************************************************************/
+
+package org.eclipse.kura.protocol.modbus;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Properties;
+
+import org.eclipse.kura.comm.CommConnection;
+import org.eclipse.kura.protocol.modbus.test.ModbusSlave;
+import org.eclipse.kura.protocol.modbus.test.SerialSlave;
+import org.eclipse.kura.protocol.modbus.test.SerialSlave.Fault;
+import org.eclipse.kura.usb.UsbService;
+import org.eclipse.kura.usb.UsbTtyDevice;
+import org.osgi.service.io.ConnectionFactory;
+
+/**
+ * Shared steps for the features that talk to a Modbus slave over a serial port.
+ * The port is a pair of in-memory streams handed out by a mocked
+ * {@code CommConnection}, so no hardware is involved.
+ */
+abstract class AbstractSerialFeature {
+
+    protected static final String USB_PORT = "1-1.3";
+    protected static final String DEVICE_NODE = "/dev/ttyUSB0";
+    protected static final int UNIT = 1;
+
+    protected CommConnection connection;
+    protected ConnectionFactory connectionFactory;
+    protected UsbService usbService;
+    protected ModbusProtocolDevice device;
+    protected Properties config;
+    protected ModbusProtocolException failure;
+
+    protected void givenAnRtuSlave() {
+        givenASlave(ModbusTransmissionMode.RTU, ModbusSlave::reply, Fault.NONE);
+    }
+
+    protected void givenAnAsciiSlave() {
+        givenASlave(ModbusTransmissionMode.ASCII, ModbusSlave::reply, Fault.NONE);
+    }
+
+    protected void givenAnRtuSlaveWith(Fault fault) {
+        givenASlave(ModbusTransmissionMode.RTU, ModbusSlave::reply, fault);
+    }
+
+    protected void givenAnAsciiSlaveWith(Fault fault) {
+        givenASlave(ModbusTransmissionMode.ASCII, ModbusSlave::reply, fault);
+    }
+
+    protected void givenASlave(String transmissionMode, SerialSlave.Responder responder, Fault fault) {
+        SerialSlave slave = new SerialSlave(ModbusTransmissionMode.ASCII.equals(transmissionMode), responder, fault);
+
+        this.connection = mock(CommConnection.class);
+        this.connectionFactory = mock(ConnectionFactory.class);
+        try {
+            when(this.connection.openInputStream()).thenReturn(slave.getInputStream());
+            when(this.connection.openOutputStream()).thenReturn(slave.getOutputStream());
+            when(this.connectionFactory.createConnection(anyString(), anyInt(), anyBoolean()))
+                    .thenReturn(this.connection);
+        } catch (IOException e) {
+            fail("the serial port mocks could not be set up: " + e.getMessage());
+        }
+
+        UsbTtyDevice tty = mock(UsbTtyDevice.class);
+        when(tty.getUsbPort()).thenReturn(USB_PORT);
+        when(tty.getDeviceNode()).thenReturn(DEVICE_NODE);
+
+        this.usbService = mock(UsbService.class);
+        when(this.usbService.getUsbTtyDevices()).thenReturn(Collections.singletonList(tty));
+
+        this.device = new ModbusProtocolDevice();
+        this.device.setConnectionFactory(this.connectionFactory);
+        this.device.setUsbService(this.usbService);
+
+        this.config = new Properties();
+        this.config.setProperty("connectionType", ModbusProtocolDevice.PROTOCOL_CONNECTION_TYPE_SERIAL);
+        this.config.setProperty("transmissionMode", transmissionMode);
+        this.config.setProperty("respTimeout", "150");
+        this.config.setProperty("port", USB_PORT);
+        this.config.setProperty("baudRate", "9600");
+        this.config.setProperty("stopBits", "1");
+        this.config.setProperty("parity", "0");
+        this.config.setProperty("bitsPerWord", "8");
+    }
+
+    protected void givenAnOpenConnection() {
+        try {
+            this.device.configureConnection(this.config);
+            this.device.connect();
+        } catch (ModbusProtocolException e) {
+            fail("the connection could not be opened: " + e.getMessage());
+        }
+    }
+
+    protected void givenTheConfigurationWithout(String property) {
+        this.config.remove(property);
+    }
+
+    protected void givenTheConfigurationProperty(String property, String value) {
+        this.config.setProperty(property, value);
+    }
+
+    protected void whenTheConnectionIsConfigured() {
+        try {
+            this.device.configureConnection(this.config);
+            this.device.connect();
+        } catch (ModbusProtocolException e) {
+            this.failure = e;
+        }
+    }
+
+    protected void thenNoFailureIsReported() {
+        if (this.failure != null) {
+            fail("unexpected failure: " + this.failure.getMessage());
+        }
+    }
+
+    protected void thenTheFailureCodeIs(ModbusProtocolErrorCode expected) {
+        assertNotNull("no failure was reported", this.failure);
+        assertEquals(expected, this.failure.getCode());
+    }
+
+    protected void thenTheFailureMentions(String text) {
+        assertNotNull("no failure was reported", this.failure);
+        assertTrue(this.failure.getMessage().contains(text));
+    }
+
+    protected void thenTheConnectionStatusIs(int expected) {
+        assertEquals(expected, this.device.getConnectStatus());
+    }
+}

@@ -22,27 +22,73 @@ import org.junit.Test;
 public class ModbusCommEventTest {
 
     @Test
-    public void shouldStartEmpty() {
-        ModbusCommEvent event = new ModbusCommEvent();
+    public void shouldStartOutEmpty() {
+        whenACommEventIsCreated();
 
-        assertEquals(0, event.getStatus());
-        assertEquals(0, event.getEventCount());
-        assertEquals(0, event.getMessageCount());
-        assertNull(event.getEvents());
+        thenStatusIs(0);
+        thenEventCountIs(0);
+        thenMessageCountIs(0);
+        thenNoEventIsRecorded();
     }
 
     @Test
     public void shouldRetainTheAssignedValues() {
-        ModbusCommEvent event = new ModbusCommEvent();
+        givenACommEvent();
 
-        event.setStatus(0xffff);
-        event.setEventCount(12);
-        event.setMessageCount(34);
-        event.setEvents(new int[] { 1, 2, 3 });
+        whenStatusIsSetTo(0xffff);
+        whenEventCountIsSetTo(12);
+        whenMessageCountIsSetTo(34);
+        whenEventsAreSetTo(1, 2, 3);
 
-        assertEquals(0xffff, event.getStatus());
-        assertEquals(12, event.getEventCount());
-        assertEquals(34, event.getMessageCount());
-        assertArrayEquals(new int[] { 1, 2, 3 }, event.getEvents());
+        thenStatusIs(0xffff);
+        thenEventCountIs(12);
+        thenMessageCountIs(34);
+        thenRecordedEventsAre(1, 2, 3);
+    }
+
+    private ModbusCommEvent event;
+
+    private void givenACommEvent() {
+        this.event = new ModbusCommEvent();
+    }
+
+    private void whenACommEventIsCreated() {
+        this.event = new ModbusCommEvent();
+    }
+
+    private void whenStatusIsSetTo(int status) {
+        this.event.setStatus(status);
+    }
+
+    private void whenEventCountIsSetTo(int eventCount) {
+        this.event.setEventCount(eventCount);
+    }
+
+    private void whenMessageCountIsSetTo(int messageCount) {
+        this.event.setMessageCount(messageCount);
+    }
+
+    private void whenEventsAreSetTo(int... events) {
+        this.event.setEvents(events);
+    }
+
+    private void thenStatusIs(int expected) {
+        assertEquals(expected, this.event.getStatus());
+    }
+
+    private void thenEventCountIs(int expected) {
+        assertEquals(expected, this.event.getEventCount());
+    }
+
+    private void thenMessageCountIs(int expected) {
+        assertEquals(expected, this.event.getMessageCount());
+    }
+
+    private void thenNoEventIsRecorded() {
+        assertNull(this.event.getEvents());
+    }
+
+    private void thenRecordedEventsAre(int... expected) {
+        assertArrayEquals(expected, this.event.getEvents());
     }
 }
