@@ -1,0 +1,89 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Eurotech and/or its affiliates and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *  Eurotech
+ ******************************************************************************/
+
+package org.eclipse.kura.protocol.modbus.test;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+/**
+ * A TCP endpoint that answers every connection with a fixed frame, or misbehaves
+ * on purpose. Used to drive the error paths of the Modbus TCP transport.
+ */
+public class ScriptedTcpServer implements AutoCloseable {
+
+    public enum Behaviour {
+        /** Read the request, then write the scripted frame. */
+        RESPOND,
+        /** Read the request, then keep the connection open without answering. */
+        SILENT,
+        /** Close the connection as soon as it is accepted. */
+        CLOSE
+    }
+
+    private static final long SILENT_HOLD = 3000;
+
+    private final ServerSocket serverSocket;
+    private final Behaviour behaviour;
+    private final byte[] response;
+
+    private volatile boolean running = true;
+
+    public ScriptedTcpServer(Behaviour behaviour, byte... response) throws IOException {
+        this.behaviour = behaviour;
+        this.response = response;
+        this.serverSocket = new ServerSocket(0);
+
+        Thread thread = new Thread(this::serve, "ScriptedTcpServer");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    public int getPort() {
+        return this.serverSocket.getLocalPort();
+    }
+
+    private void serve() {
+        while (this.running) {
+            try (Socket socket = this.serverSocket.accept()) {
+                handle(socket);
+            } catch (IOException | InterruptedException e) {
+                return;
+            }
+        }
+    }
+
+    private void handle(Socket socket) throws IOException, InterruptedException {
+        if (this.behaviour == Behaviour.CLOSE) {
+            return;
+        }
+
+        socket.getInputStream().read(new byte[256]);
+
+        if (this.behaviour == Behaviour.RESPOND) {
+            socket.getOutputStream().write(this.response);
+            socket.getOutputStream().flush();
+            // give the client time to read before the socket is closed
+            Thread.sleep(200);
+            return;
+        }
+        Thread.sleep(SILENT_HOLD);
+    }
+
+    @Override
+    public void close() throws IOException {
+        this.running = false;
+        this.serverSocket.close();
+    }
+}

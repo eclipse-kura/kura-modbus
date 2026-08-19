@@ -1,0 +1,205 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Eurotech and/or its affiliates and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *  Eurotech
+ ******************************************************************************/
+
+package org.eclipse.kura.protocol.modbus.test;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Arrays;
+
+import org.eclipse.kura.protocol.modbus.Crc16;
+
+/**
+ * A Modbus slave reachable over a pair of in-memory streams, standing in for a
+ * serial port. The request is decoded as soon as the driver flushes it and the
+ * answer is made available for reading straight away, so no additional thread is
+ * involved.
+ */
+public class SerialSlave {
+
+    /** Answers a request payload, checksum and framing excluded. */
+    public interface Responder {
+
+        byte[] respond(byte[] request);
+    }
+
+    /** How the slave should misbehave, if at all. */
+    public enum Fault {
+        NONE,
+        /** Never answer, so the driver runs into its response timeout. */
+        SILENT,
+        /** Answer with a corrupted CRC / LRC. */
+        BAD_CHECKSUM,
+        /** Announce available data but close the stream instead. */
+        END_OF_STREAM,
+        /** Fail while the request is being written. */
+        WRITE_ERROR,
+        /** Append a stray byte after the frame. */
+        EXTRA_BYTES
+    }
+
+    private static final byte FRAME_START = ':';
+    private static final byte CR = 13;
+    private static final byte LF = 10;
+    private static final char[] HEX = "0123456789ABCDEF".toCharArray();
+
+    private final boolean ascii;
+    private final Responder responder;
+    private final Fault fault;
+
+    private final ByteArrayOutputStream request = new ByteArrayOutputStream();
+    private byte[] response = new byte[0];
+    private int responseIndex = 0;
+    private boolean answered = false;
+
+    private final InputStream in = new InputStream() {
+
+        @Override
+        public int read() {
+            if (SerialSlave.this.responseIndex >= SerialSlave.this.response.length) {
+                return -1;
+            }
+            return SerialSlave.this.response[SerialSlave.this.responseIndex++] & 0xff;
+        }
+
+        @Override
+        public int available() {
+            if (SerialSlave.this.fault == Fault.END_OF_STREAM && SerialSlave.this.answered) {
+                // claim there is something to read, then hand out the end of the stream
+                return 1;
+            }
+            return SerialSlave.this.response.length - SerialSlave.this.responseIndex;
+        }
+    };
+
+    private final OutputStream out = new OutputStream() {
+
+        @Override
+        public void write(int b) throws IOException {
+            if (SerialSlave.this.fault == Fault.WRITE_ERROR) {
+                throw new IOException("the port went away");
+            }
+            SerialSlave.this.request.write(b);
+        }
+
+        @Override
+        public void flush() {
+            SerialSlave.this.answer(SerialSlave.this.request.toByteArray());
+            SerialSlave.this.request.reset();
+        }
+    };
+
+    public SerialSlave(boolean ascii, Responder responder) {
+        this(ascii, responder, Fault.NONE);
+    }
+
+    public SerialSlave(boolean ascii, Responder responder, Fault fault) {
+        this.ascii = ascii;
+        this.responder = responder;
+        this.fault = fault;
+    }
+
+    public InputStream getInputStream() {
+        return this.in;
+    }
+
+    public OutputStream getOutputStream() {
+        return this.out;
+    }
+
+    private void answer(byte[] rawRequest) {
+        this.responseIndex = 0;
+        this.answered = true;
+        if (this.fault == Fault.SILENT || this.fault == Fault.END_OF_STREAM) {
+            this.response = new byte[0];
+            return;
+        }
+
+        byte[] payload = this.responder.respond(decode(rawRequest));
+        if (payload == null) {
+            this.response = new byte[0];
+            return;
+        }
+
+        byte[] frame = this.ascii ? encodeAscii(payload) : encodeRtu(payload);
+        if (this.fault == Fault.BAD_CHECKSUM) {
+            corrupt(frame);
+        }
+        if (this.fault == Fault.EXTRA_BYTES) {
+            frame = Arrays.copyOf(frame, frame.length + 1);
+        }
+        this.response = frame;
+    }
+
+    private void corrupt(byte[] frame) {
+        if (this.ascii) {
+            // swap the low LRC digit for another valid one, so that only the checksum is wrong
+            int last = frame.length - 3;
+            frame[last] = (byte) (frame[last] == '0' ? '1' : '0');
+            return;
+        }
+        frame[frame.length - 3] ^= 0x5a;
+    }
+
+    private byte[] decode(byte[] rawRequest) {
+        if (!this.ascii) {
+            // drop the trailing CRC
+            byte[] payload = new byte[rawRequest.length - 2];
+            System.arraycopy(rawRequest, 0, payload, 0, payload.length);
+            return payload;
+        }
+        // ':' + payload + LRC + CR + LF
+        int length = (rawRequest.length - 5) / 2;
+        byte[] payload = new byte[length];
+        for (int i = 0; i < length; i++) {
+            payload[i] = (byte) Integer.parseInt(new String(
+                    new char[] { (char) rawRequest[i * 2 + 1], (char) rawRequest[i * 2 + 2] }), 16);
+        }
+        return payload;
+    }
+
+    private static byte[] encodeRtu(byte[] payload) {
+        byte[] frame = new byte[payload.length + 2];
+        System.arraycopy(payload, 0, frame, 0, payload.length);
+        int crc = Crc16.getCrc16(payload, payload.length, 0x0ffff);
+        frame[payload.length] = (byte) crc;
+        frame[payload.length + 1] = (byte) (crc >> 8);
+        return frame;
+    }
+
+    private static byte[] encodeAscii(byte[] payload) {
+        byte[] frame = new byte[payload.length * 2 + 5];
+        frame[0] = FRAME_START;
+        for (int i = 0; i < payload.length; i++) {
+            int v = payload[i] & 0xff;
+            frame[i * 2 + 1] = (byte) HEX[v >>> 4];
+            frame[i * 2 + 2] = (byte) HEX[v & 0x0f];
+        }
+        int lrc = lrc(payload) & 0xff;
+        frame[frame.length - 4] = (byte) HEX[lrc >>> 4];
+        frame[frame.length - 3] = (byte) HEX[lrc & 0x0f];
+        frame[frame.length - 2] = CR;
+        frame[frame.length - 1] = LF;
+        return frame;
+    }
+
+    private static int lrc(byte[] payload) {
+        int sum = 0;
+        for (byte element : payload) {
+            sum += element & 0xff;
+        }
+        return (sum ^ 0xff) + 1;
+    }
+}

@@ -37,31 +37,11 @@ public class ModbusProtocolException extends Exception {
     private static final String PROTOCOL_GENERIC_MESSAGES_PATTERN = "Generic Error - {0}: {1} {2} {3} {4} {5}";
     private static final String PROTOCOL_EXCEPTION_MESSAGES_BUNDLE = "org.eclipse.kura.protocol.messages.ProtocolExceptionMessagesBundle";
 
-    private static final Logger s_logger = LoggerFactory.getLogger(ModbusProtocolException.class);
+    private static final Logger logger = LoggerFactory.getLogger(ModbusProtocolException.class);
 
-    protected ModbusProtocolErrorCode m_code;
-    private Object[] m_arguments;
-    private String m_complement;
-
-    @SuppressWarnings("unused")
-    private ModbusProtocolException() {
-        super();
-    }
-
-    @SuppressWarnings("unused")
-    private ModbusProtocolException(String message) {
-        super(message);
-    }
-
-    @SuppressWarnings("unused")
-    private ModbusProtocolException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    @SuppressWarnings("unused")
-    private ModbusProtocolException(Throwable t) {
-        super(t);
-    }
+    private final ModbusProtocolErrorCode code;
+    private final transient Object[] arguments;
+    private final String complement;
 
     /**
      * Builds a new EdcException instance based on the supplied EdcErrorCode.
@@ -69,7 +49,9 @@ public class ModbusProtocolException extends Exception {
      * @param code
      */
     public ModbusProtocolException(ModbusProtocolErrorCode code) {
-        this.m_code = code;
+        this.code = code;
+        this.complement = null;
+        this.arguments = null;
     }
 
     /**
@@ -79,8 +61,9 @@ public class ModbusProtocolException extends Exception {
      * @param complement
      */
     public ModbusProtocolException(ModbusProtocolErrorCode code, String complement) {
-        this.m_code = code;
-        this.m_complement = complement;
+        this.code = code;
+        this.complement = complement;
+        this.arguments = null;
     }
 
     /**
@@ -93,12 +76,13 @@ public class ModbusProtocolException extends Exception {
     public ModbusProtocolException(ModbusProtocolErrorCode code, Throwable cause, Object... arguments) {
         super(cause);
 
-        this.m_code = code;
-        this.m_arguments = arguments;
+        this.code = code;
+        this.arguments = arguments;
+        this.complement = null;
     }
 
     public ModbusProtocolErrorCode getCode() {
-        return this.m_code;
+        return this.code;
     }
 
     @Override
@@ -113,9 +97,8 @@ public class ModbusProtocolException extends Exception {
 
     private String getLocalizedMessage(Locale locale) {
 
-        String pattern = getMessagePattern(locale, this.m_code);
-        String message = MessageFormat.format(pattern, this.m_arguments) + " " + this.m_complement;
-        return message;
+        String pattern = getMessagePattern(locale, this.code);
+        return MessageFormat.format(pattern, this.arguments) + " " + this.complement;
     }
 
     private String getMessagePattern(Locale locale, ModbusProtocolErrorCode code) {
@@ -129,11 +112,11 @@ public class ModbusProtocolException extends Exception {
             resourceBundle = ResourceBundle.getBundle(PROTOCOL_EXCEPTION_MESSAGES_BUNDLE, locale);
             messagePattern = resourceBundle.getString(code.name());
             if (messagePattern == null) {
-                s_logger.warn("Could not find Exception Messages for Locale {} and code {}", locale, code);
+                logger.warn("Could not find Exception Messages for Locale {} and code {}", locale, code);
             }
         } catch (MissingResourceException mre) {
             // log the failure to load a message bundle
-            s_logger.warn("Could not load Exception Messages Bundle for Locale {}", locale);
+            logger.warn("Could not load Exception Messages Bundle for Locale {}", locale);
         }
 
         //
