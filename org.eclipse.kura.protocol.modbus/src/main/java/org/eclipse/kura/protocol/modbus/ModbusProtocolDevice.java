@@ -511,8 +511,11 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
                                 long start = System.currentTimeMillis();
                                 while (this.in.available() == 0) {
                                     try {
-                                        Thread.sleep(5);	// avoid a high cpu load
+                                        // avoid a high cpu load; wait() releases
+                                        // the monitor while pausing
+                                        this.in.wait(5);
                                     } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
                                         throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
                                                 "Thread interrupted");
                                     }
@@ -528,17 +531,15 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
                                 }
                                 // address byte must match first
                                 if (respIndex == 0) {
-                                    if (ModbusProtocolDevice.this.txMode == ModbusTransmissionMode.ASCII_MODE) {
-                                        if ((response[0] = (byte) this.in.read()) == ':') {
-                                            respIndex++;
-                                        }
-                                    } else {
-                                        if ((response[0] = (byte) this.in.read()) == msg[0]) {
-                                            respIndex++;
-                                        }
+                                    byte expected = ModbusProtocolDevice.this.txMode == ModbusTransmissionMode.ASCII_MODE
+                                            ? (byte) ':'
+                                            : msg[0];
+                                    response[0] = readByte();
+                                    if (response[0] == expected) {
+                                        respIndex++;
                                     }
                                 } else {
-                                    response[respIndex++] = (byte) this.in.read();
+                                    response[respIndex++] = readByte();
                                 }
 
                                 if (ModbusProtocolDevice.this.txMode == ModbusTransmissionMode.RTU_MODE) {
@@ -633,6 +634,15 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
             }
             throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
                     "Too much activity on recv line");
+        }
+
+        private byte readByte() throws IOException, ModbusProtocolException {
+            int value = this.in.read();
+            if (value == -1) {
+                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
+                        "End of stream reached while reading the response");
+            }
+            return (byte) value;
         }
     }
 
