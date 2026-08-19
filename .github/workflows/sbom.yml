@@ -23,6 +23,4 @@ jobs:
   call-workflow-in-public-repo:
     uses: eclipse-kura/.github/.github/workflows/_shared-sbom-cyclonedx.yml@main
     with:
-      # UUID of the kura-s7 project on the Eclipse Dependency-Track instance.
-      # Every repository has its own, see for instance kura-camel or kura-gpio.
-      dependency-track-id: 'CHANGEME'
+      dependency-track-id: '88b926a2-2d26-4262-ae4d-0dd69a66f4ac'
