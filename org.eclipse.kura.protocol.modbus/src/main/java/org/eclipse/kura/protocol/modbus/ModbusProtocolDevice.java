@@ -22,8 +22,11 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.eclipse.kura.KuraConnectionStatus;
 import org.eclipse.kura.comm.CommConnection;
@@ -400,6 +403,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         OutputStream out;
         CommConnection conn = null;
 
+        private final Lock transactionLock = new ReentrantLock();
+
         public SerialCommunicate(ConnectionFactory connFactory, Properties connectionConfig)
                 throws ModbusProtocolException {
             logger.info("Configure serial connection");
@@ -501,20 +506,19 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         public byte[] msgTransaction(byte[] msg) throws ModbusProtocolException {
             byte[] cmd = isAsciiMode() ? convertCommandToAscii(msg) : appendCrc(msg);
 
-            // Send the message
+            // one transaction at a time: the answer belongs to the request just sent
+            this.transactionLock.lock();
             try {
-                synchronized (this.out) {
-                    synchronized (this.in) {
-                        flushInput();
-                        // send all data
-                        this.out.write(cmd, 0, cmd.length);
-                        this.out.flush();
+                flushInput();
+                // send all data
+                this.out.write(cmd, 0, cmd.length);
+                this.out.flush();
 
-                        return receiveResponse(msg);
-                    }
-                }
+                return receiveResponse(msg);
             } catch (IOException e) {
                 throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE, e.getMessage());
+            } finally {
+                this.transactionLock.unlock();
             }
         }
 
@@ -536,9 +540,9 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
                 response.readFrame();
                 response.convertFromAscii();
 
-                byte[] payload = response.extractPayload();
-                if (payload != null) {
-                    return payload;
+                Optional<byte[]> payload = response.extractPayload();
+                if (payload.isPresent()) {
+                    return payload.get();
                 }
 
                 /*
@@ -608,9 +612,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
 
         private void pause() throws ModbusProtocolException {
             try {
-                // avoid a high cpu load; wait() releases
-                // the monitor while pausing
-                this.in.wait(POLL_INTERVAL);
+                // avoid a high cpu load while the answer trickles in
+                Thread.sleep(POLL_INTERVAL);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE, "Thread interrupted");
@@ -680,14 +683,14 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         }
 
         /**
-         * @return the payload to hand back to the caller, or null when the frame is
+         * @return the payload to hand back to the caller, or empty when the frame is
          *         incomplete or invalid and another read is required.
          */
-        byte[] extractPayload() throws ModbusProtocolException {
+        Optional<byte[]> extractPayload() throws ModbusProtocolException {
             // Check first for an Exception response
             if ((this.data[1] & 0x80) == 0x80) {
                 checkExceptionResponse();
-                return null;
+                return Optional.empty();
             }
             // then check for a valid message
             return extractValidPayload();
@@ -700,7 +703,7 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
             }
         }
 
-        private byte[] extractValidPayload() {
+        private Optional<byte[]> extractValidPayload() {
             byte function = this.data[1];
             if (isWriteEcho(function)) {
                 return extractEcho();
@@ -708,32 +711,32 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
             if (isDataRead(function)) {
                 return extractRegisters();
             }
-            return null;
+            return Optional.empty();
         }
 
-        private byte[] extractEcho() {
+        private Optional<byte[]> extractEcho() {
             if (this.length < ECHO_FRAME_LENGTH) {
                 // wait for more data
                 this.minimumLength = ECHO_FRAME_LENGTH;
-                return null;
+                return Optional.empty();
             }
             if (this.ascii || Crc16.getCrc16(this.data, ECHO_FRAME_LENGTH, 0xffff) == 0) {
-                return Arrays.copyOf(this.data, 6);
+                return Optional.of(Arrays.copyOf(this.data, 6));
             }
-            return null;
+            return Optional.empty();
         }
 
-        private byte[] extractRegisters() {
+        private Optional<byte[]> extractRegisters() {
             int byteCnt = this.ascii ? (this.data[2] & 0xff) + 3 : (this.data[2] & 0xff) + 5;
             if (this.length < byteCnt) {
                 // wait for more data
                 this.minimumLength = byteCnt;
-                return null;
+                return Optional.empty();
             }
             if (this.ascii || Crc16.getCrc16(this.data, byteCnt, 0xffff) == 0) {
-                return Arrays.copyOf(this.data, byteCnt);
+                return Optional.of(Arrays.copyOf(this.data, byteCnt));
             }
-            return null;
+            return Optional.empty();
         }
 
         void dropFirstByte() {
