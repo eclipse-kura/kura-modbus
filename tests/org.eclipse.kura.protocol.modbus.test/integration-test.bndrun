@@ -79,9 +79,9 @@ Test-Cases: ${classes;CONCRETE;PUBLIC;NAMED;*Test}
 # Runbundles automatically populated by bnd-resolver
 #
 -runbundles: \
-	bcpkix;version='[1.84.0,1.84.1)',\
-	bcprov;version='[1.84.0,1.84.1)',\
-	bcutil;version='[1.84.0,1.84.1)',\
+	bcpkix;version='[1.86.0,1.86.1)',\
+	bcprov;version='[1.86.0,1.86.1)',\
+	bcutil;version='[1.86.0,1.86.1)',\
 	com.google.gson;version='[2.9.0,2.9.1)',\
 	com.google.guava;version='[32.1.1,32.1.2)',\
 	com.google.guava.failureaccess;version='[1.0.1,1.0.2)',\
@@ -164,7 +164,6 @@ Test-Cases: ${classes;CONCRETE;PUBLIC;NAMED;*Test}
 	org.eclipse.kura.protocol.modbus;version='[3.0.0,3.0.1)',\
 	org.eclipse.kura.protocol.modbus.test;version='[3.0.0,3.0.1)',\
 	org.eclipse.kura.request.handler.jaxrs;version='[2.0.0,2.0.1)',\
-	org.eclipse.kura.rest.configuration.provider;version='[2.0.0,2.0.1)',\
 	org.eclipse.kura.rest.provider;version='[2.0.0,2.0.1)',\
 	org.eclipse.kura.rest.security.provider;version='[2.0.0,2.0.1)',\
 	org.eclipse.kura.useradmin.store;version='[2.0.0,2.0.1)',\
@@ -208,4 +207,5 @@ Test-Cases: ${classes;CONCRETE;PUBLIC;NAMED;*Test}
 	osgi.cmpn;version='[4.2.0,4.2.1)',\
 	quartz;version='[2.5.0,2.5.1)',\
 	slf4j.api;version='[2.0.17,2.0.18)',\
-	usb4java-javax;version='[2.0.0,2.0.1)'
+	usb4java-javax;version='[2.0.0,2.0.1)',\
+	com.google.protobuf;version='[4.30.2,4.30.3)'
