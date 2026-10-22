@@ -21,7 +21,6 @@ import static org.junit.Assert.fail;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-
 import org.eclipse.kura.KuraConnectionStatus;
 import org.junit.Before;
 import org.junit.Test;
@@ -284,8 +283,8 @@ public class ConnectionConfigurationTest {
     private void whenEveryWriteIsAttempted() {
         attempt(() -> this.device.writeSingleCoil(1, 0, true));
         attempt(() -> this.device.writeSingleRegister(1, 0, 1));
-        attempt(() -> this.device.writeMultipleCoils(1, 0, new boolean[] { true }));
-        attempt(() -> this.device.writeMultipleRegister(1, 0, new int[] { 1 }));
+        attempt(() -> this.device.writeMultipleCoils(1, 0, new boolean[] {true}));
+        attempt(() -> this.device.writeMultipleRegister(1, 0, new int[] {1}));
     }
 
     private void attempt(ModbusCall call) {
