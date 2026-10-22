@@ -22,7 +22,6 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
-
 import org.junit.Test;
 
 public class ModbusProtocolExceptionTest {

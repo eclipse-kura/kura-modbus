@@ -1,12 +1,12 @@
 /*******************************************************************************
- * Copyright (c) 2011, 2020 Eurotech and/or its affiliates and others
- * 
+ * Copyright (c) 2011, 2026 Eurotech and/or its affiliates and others
+ *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
- * 
+ *
  * Contributors:
  *  Eurotech
  *******************************************************************************/
@@ -36,8 +36,7 @@ public class ModbusDataOrder {
     /**
      *
      */
-    private ModbusDataOrder() {
-    }
+    private ModbusDataOrder() {}
 
     /**
      * booleans do not have a specified data order
@@ -47,11 +46,13 @@ public class ModbusDataOrder {
      * this is the Modbus default (note only 16 bit or 2 byte data)
      */
     public static final String MODBUS_WORD_ORDER_BIG_ENDIAN = "12";
+
     public static final String MODBUS_WORD_ORDER_LITTLE_ENDIAN = "21";
     /**
      * this is the most common 32 bit arrangement used by many devices
      */
     public static final String MODBUS_LONG_ORDER_BIG_BIG_ENDIAN = "1234";
+
     public static final String MODBUS_LONG_ORDER_BIG_LITTLE_ENDIAN = "2143";
     public static final String MODBUS_LONG_ORDER_LITTLE_BIG_ENDIAN = "3412";
     public static final String MODBUS_LONG_ORDER_LITTLE_LITTLE_ENDIAN = "4321";

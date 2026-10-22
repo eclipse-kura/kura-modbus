@@ -22,28 +22,27 @@ import java.util.Arrays;
  */
 public final class ModbusSlave {
 
-    private ModbusSlave() {
-    }
+    private ModbusSlave() {}
 
     public static byte[] reply(byte[] request) {
         byte unit = request[0];
         byte function = request[1];
 
         switch (function) {
-        case 1:
-        case 2:
-            return readBits(unit, function, count(request));
-        case 3:
-        case 4:
-            return readRegisters(unit, function, count(request));
-        case 5:
-        case 6:
-        case 15:
-        case 16:
-            // the slave echoes the header of a write command
-            return Arrays.copyOf(request, 6);
-        default:
-            return illegalFunction(unit, function);
+            case 1:
+            case 2:
+                return readBits(unit, function, count(request));
+            case 3:
+            case 4:
+                return readRegisters(unit, function, count(request));
+            case 5:
+            case 6:
+            case 15:
+            case 16:
+                // the slave echoes the header of a write command
+                return Arrays.copyOf(request, 6);
+            default:
+                return illegalFunction(unit, function);
         }
     }
 
@@ -60,7 +59,7 @@ public final class ModbusSlave {
     }
 
     private static byte[] illegalFunction(byte unit, byte function) {
-        return new byte[] { unit, (byte) (function | 0x80), 0x01 };
+        return new byte[] {unit, (byte) (function | 0x80), 0x01};
     }
 
     private static int count(byte[] request) {

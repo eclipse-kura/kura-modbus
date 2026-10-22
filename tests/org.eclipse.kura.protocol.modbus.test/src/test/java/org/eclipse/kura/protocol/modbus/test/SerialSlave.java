@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
-
 import org.eclipse.kura.protocol.modbus.Crc16;
 
 /**
@@ -165,8 +164,8 @@ public class SerialSlave {
         int length = (rawRequest.length - 5) / 2;
         byte[] payload = new byte[length];
         for (int i = 0; i < length; i++) {
-            payload[i] = (byte) Integer.parseInt(new String(
-                    new char[] { (char) rawRequest[i * 2 + 1], (char) rawRequest[i * 2 + 2] }), 16);
+            payload[i] = (byte) Integer.parseInt(
+                    new String(new char[] {(char) rawRequest[i * 2 + 1], (char) rawRequest[i * 2 + 2]}), 16);
         }
         return payload;
     }

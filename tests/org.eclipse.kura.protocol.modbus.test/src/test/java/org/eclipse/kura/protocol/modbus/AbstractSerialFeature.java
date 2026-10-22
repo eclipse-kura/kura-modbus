@@ -27,7 +27,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Properties;
-
 import org.eclipse.kura.comm.CommConnection;
 import org.eclipse.kura.protocol.modbus.test.ModbusSlave;
 import org.eclipse.kura.protocol.modbus.test.SerialSlave;

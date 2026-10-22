@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
 import org.eclipse.kura.KuraConnectionStatus;
 import org.eclipse.kura.protocol.modbus.ModbusProtocolDeviceService;
 import org.eclipse.kura.protocol.modbus.ModbusProtocolErrorCode;
@@ -542,5 +541,4 @@ public class ModbusProtocolDeviceServiceItTest {
         fail("no " + clazz.getSimpleName() + " service in " + TIMEOUT_SECONDS + " seconds");
         return null;
     }
-
 }

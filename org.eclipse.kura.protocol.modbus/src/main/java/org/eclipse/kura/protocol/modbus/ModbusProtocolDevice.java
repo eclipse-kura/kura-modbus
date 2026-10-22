@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2011, 2026 Eurotech and/or its affiliates and others
- * 
+ *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
- * 
+ *
  * Contributors:
  *  Eurotech
  *  Red Hat Inc
@@ -28,7 +28,6 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
 import org.eclipse.kura.KuraConnectionStatus;
 import org.eclipse.kura.comm.CommConnection;
 import org.eclipse.kura.comm.CommURI;
@@ -418,8 +417,14 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
             int parity = Integer.parseInt(sParity);
             int bits = Integer.parseInt(sBits);
 
-            String uri = new CommURI.Builder(sPort).withBaudRate(baud).withDataBits(bits).withStopBits(stop)
-                    .withParity(parity).withTimeout(2000).build().toString();
+            String uri = new CommURI.Builder(sPort)
+                    .withBaudRate(baud)
+                    .withDataBits(bits)
+                    .withStopBits(stop)
+                    .withParity(parity)
+                    .withTimeout(2000)
+                    .build()
+                    .toString();
 
             try {
                 this.conn = (CommConnection) connFactory.createConnection(uri, 1, false);
@@ -518,8 +523,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         }
 
         private byte[] receiveResponse(byte[] msg) throws IOException, ModbusProtocolException {
-            SerialResponse response = new SerialResponse(this.in, msg, isAsciiMode(),
-                    ModbusProtocolDevice.this.respTout);
+            SerialResponse response =
+                    new SerialResponse(this.in, msg, isAsciiMode(), ModbusProtocolDevice.this.respTout);
 
             for (int attempt = 0; attempt < MAX_RECV_ATTEMPTS; attempt++) {
                 response.readFrame();
@@ -537,8 +542,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
                 response.dropFirstByte();
             }
 
-            throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
-                    "Too much activity on recv line");
+            throw new ModbusProtocolException(
+                    ModbusProtocolErrorCode.TRANSACTION_FAILURE, "Too much activity on recv line");
         }
     }
 
@@ -582,7 +587,10 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
 
                 long elapsed = System.currentTimeMillis() - start;
                 if (elapsed > this.timeOut) {
-                    logger.warn("Recv timeout : {} minimumLength={} respIndex={}", elapsed, this.minimumLength,
+                    logger.warn(
+                            "Recv timeout : {} minimumLength={} respIndex={}",
+                            elapsed,
+                            this.minimumLength,
                             this.length);
                     throw new ModbusProtocolException(ModbusProtocolErrorCode.RESPONSE_TIMEOUT, "Recv timeout");
                 }
@@ -614,7 +622,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         private byte readByte() throws IOException, ModbusProtocolException {
             int value = this.in.read();
             if (value == -1) {
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.TRANSACTION_FAILURE,
                         "End of stream reached while reading the response");
             }
             return (byte) value;
@@ -637,7 +646,7 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         }
 
         private byte asciiLrcCalc(byte[] msg, int len) {
-            char[] ac = new char[] { (char) msg[len - 4], (char) msg[len - 3] };
+            char[] ac = new char[] {(char) msg[len - 4], (char) msg[len - 3]};
             return (byte) Integer.parseInt(new String(ac), 16);
         }
 
@@ -669,7 +678,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
 
         private void checkExceptionResponse() throws ModbusProtocolException {
             if (this.ascii || Crc16.getCrc16(this.data, RTU_MINIMUM_LENGTH, 0xffff) == 0) {
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.TRANSACTION_FAILURE,
                         "Exception response = " + Byte.toString(this.data[2]));
             }
         }
@@ -762,8 +772,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
             }
             try {
                 this.socket = new Socket();
-                this.socket.connect(new InetSocketAddress(this.ipAddress, this.port),
-                        ModbusProtocolDevice.this.respTout);
+                this.socket.connect(
+                        new InetSocketAddress(this.ipAddress, this.port), ModbusProtocolDevice.this.respTout);
                 openStreams();
             } catch (IOException e) {
                 this.socket = null;
@@ -825,8 +835,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
             // Check connection status and connect
             connect();
             if (!this.connected) {
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
-                        "Cannot transact on closed socket");
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.TRANSACTION_FAILURE, "Cannot transact on closed socket");
             }
 
             sendCommand(cmd);
@@ -836,8 +846,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
 
         private byte[] buildCommand(byte[] msg) throws ModbusProtocolException {
             if (isAsciiMode()) {
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.METHOD_NOT_SUPPORTED,
-                        "Only RTU over TCP/IP supported");
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.METHOD_NOT_SUPPORTED, "Only RTU over TCP/IP supported");
             }
             if (isModbusTcp()) {
                 return buildModbusTcpCommand(msg);
@@ -875,8 +885,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
                 // Assume this means the socket is closed...make sure it is
                 logger.error("Socket disconnect in send", e);
                 disconnect();
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
-                        "Send failure: " + e.getMessage());
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.TRANSACTION_FAILURE, "Send failure: " + e.getMessage());
             }
         }
 
@@ -961,7 +971,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         private void checkUnitId() throws ModbusProtocolException {
             // test modbus id
             if (this.data[MBAP_HEADER_LENGTH] != this.request[0]) {
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.TRANSACTION_FAILURE,
                         String.format("incorrect modbus id %02X", this.data[MBAP_HEADER_LENGTH]));
             }
         }
@@ -969,7 +980,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         private void checkFunctionCode() throws ModbusProtocolException {
             // test function number
             if ((this.data[MBAP_HEADER_LENGTH + 1] & 0x7f) != this.request[1]) {
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.TRANSACTION_FAILURE,
                         String.format("incorrect function number %02X", this.data[MBAP_HEADER_LENGTH + 1]));
             }
         }
@@ -978,7 +990,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
             byte function = this.data[MBAP_HEADER_LENGTH + 1];
             // Check first for an Exception response
             if ((function & 0x80) == 0x80) {
-                throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE,
+                throw new ModbusProtocolException(
+                        ModbusProtocolErrorCode.TRANSACTION_FAILURE,
                         String.format("Modbus responds an error = %02X", this.data[MBAP_HEADER_LENGTH + 2]));
             }
             if (isWriteEcho(function)) {
@@ -1074,14 +1087,18 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
 
     @Override
     public void writeSingleCoil(int unitAddr, int dataAddress, boolean data) throws ModbusProtocolException {
-        writeSingle(unitAddr, (byte) ModbusFunctionCodes.FORCE_SINGLE_COIL, dataAddress,
-                data ? (byte) 0xff : (byte) 0, (byte) 0);
+        writeSingle(
+                unitAddr,
+                (byte) ModbusFunctionCodes.FORCE_SINGLE_COIL,
+                dataAddress,
+                data ? (byte) 0xff : (byte) 0,
+                (byte) 0);
     }
 
     @Override
     public void writeSingleRegister(int unitAddr, int dataAddress, int data) throws ModbusProtocolException {
-        writeSingle(unitAddr, (byte) ModbusFunctionCodes.PRESET_SINGLE_REG, dataAddress, (byte) (data >> 8),
-                (byte) data);
+        writeSingle(
+                unitAddr, (byte) ModbusFunctionCodes.PRESET_SINGLE_REG, dataAddress, (byte) (data >> 8), (byte) data);
     }
 
     private void writeSingle(int unitAddr, byte functionCode, int dataAddress, byte high, byte low)
@@ -1119,8 +1136,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
          * construct the command, issue and verify response
          */
         int dataLength = (localCnt + 7) / 8;
-        byte[] cmd = buildMultipleWriteCommand(unitAddr, (byte) ModbusFunctionCodes.FORCE_MULTIPLE_COILS, dataAddress,
-                localCnt, dataLength);
+        byte[] cmd = buildMultipleWriteCommand(
+                unitAddr, (byte) ModbusFunctionCodes.FORCE_MULTIPLE_COILS, dataAddress, localCnt, dataLength);
 
         // put the data on the command
         byte mask = 1;
@@ -1162,8 +1179,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
          * construct the command, issue and verify response
          */
         int dataLength = localCnt * 2;
-        byte[] cmd = buildMultipleWriteCommand(unitAddr, (byte) ModbusFunctionCodes.PRESET_MULTIPLE_REGS, dataAddress,
-                localCnt, dataLength);
+        byte[] cmd = buildMultipleWriteCommand(
+                unitAddr, (byte) ModbusFunctionCodes.PRESET_MULTIPLE_REGS, dataAddress, localCnt, dataLength);
 
         // put the data on the command
         int byteOffset = 7;
@@ -1185,8 +1202,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
         verifyEcho(cmd, resp);
     }
 
-    private static byte[] buildMultipleWriteCommand(int unitAddr, byte functionCode, int dataAddress, int count,
-            int dataLength) {
+    private static byte[] buildMultipleWriteCommand(
+            int unitAddr, byte functionCode, int dataAddress, int count, int dataLength) {
         byte[] cmd = new byte[dataLength + 7];
         cmd[0] = (byte) unitAddr;
         cmd[1] = functionCode;
@@ -1338,5 +1355,4 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
          */
         return this.comm.msgTransaction(cmd);
     }
-
 }

@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,7 +143,7 @@ public class ModbusTcpSlave implements AutoCloseable {
     }
 
     private static byte[] exception(byte[] pdu) {
-        return new byte[] { pdu[0], (byte) (pdu[1] | 0x80), ILLEGAL_DATA_ADDRESS };
+        return new byte[] {pdu[0], (byte) (pdu[1] | 0x80), ILLEGAL_DATA_ADDRESS};
     }
 
     private byte[] handle(byte[] pdu) {
@@ -153,26 +152,26 @@ public class ModbusTcpSlave implements AutoCloseable {
         int address = word(pdu, 2);
 
         switch (function) {
-        case 1:
-        case 2:
-            return readCoils(unit, function, address, word(pdu, 4));
-        case 3:
-        case 4:
-            return readRegisters(unit, function, address, word(pdu, 4));
-        case 5:
-            this.coils[address] = (pdu[4] & 0xff) == 0xff;
-            return echo(pdu, 6);
-        case 6:
-            this.registers[address] = word(pdu, 4);
-            return echo(pdu, 6);
-        case 15:
-            writeCoils(pdu, address, word(pdu, 4));
-            return echo(pdu, 6);
-        case 16:
-            writeRegisters(pdu, address, word(pdu, 4));
-            return echo(pdu, 6);
-        default:
-            return exception(pdu);
+            case 1:
+            case 2:
+                return readCoils(unit, function, address, word(pdu, 4));
+            case 3:
+            case 4:
+                return readRegisters(unit, function, address, word(pdu, 4));
+            case 5:
+                this.coils[address] = (pdu[4] & 0xff) == 0xff;
+                return echo(pdu, 6);
+            case 6:
+                this.registers[address] = word(pdu, 4);
+                return echo(pdu, 6);
+            case 15:
+                writeCoils(pdu, address, word(pdu, 4));
+                return echo(pdu, 6);
+            case 16:
+                writeRegisters(pdu, address, word(pdu, 4));
+                return echo(pdu, 6);
+            default:
+                return exception(pdu);
         }
     }
 

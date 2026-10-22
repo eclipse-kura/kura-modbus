@@ -21,7 +21,6 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.Properties;
-
 import org.eclipse.kura.KuraConnectionStatus;
 import org.eclipse.kura.protocol.modbus.test.ScriptedTcpServer;
 import org.eclipse.kura.protocol.modbus.test.ScriptedTcpServer.Behaviour;

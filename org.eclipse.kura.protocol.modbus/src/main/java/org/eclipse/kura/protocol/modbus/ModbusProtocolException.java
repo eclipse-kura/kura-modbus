@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2011, 2026 Eurotech and/or its affiliates and others
- * 
+ *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
- * 
+ *
  * Contributors:
  *  Eurotech
  *******************************************************************************/
@@ -17,7 +17,6 @@ import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +35,8 @@ public class ModbusProtocolException extends Exception {
     private static final long serialVersionUID = -6155136065068974723L;
 
     private static final String PROTOCOL_GENERIC_MESSAGES_PATTERN = "Generic Error - {0}: {1} {2} {3} {4} {5}";
-    private static final String PROTOCOL_EXCEPTION_MESSAGES_BUNDLE = "org.eclipse.kura.protocol.messages.ProtocolExceptionMessagesBundle";
+    private static final String PROTOCOL_EXCEPTION_MESSAGES_BUNDLE =
+            "org.eclipse.kura.protocol.messages.ProtocolExceptionMessagesBundle";
 
     private static final Logger logger = LoggerFactory.getLogger(ModbusProtocolException.class);
 
