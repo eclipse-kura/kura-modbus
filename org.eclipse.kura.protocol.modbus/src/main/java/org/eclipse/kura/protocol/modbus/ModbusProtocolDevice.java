@@ -146,12 +146,14 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
      * <ul>
      * <li>serial mode (PROTOCOL_CONNECTION_TYPE_SERIAL)
      *
-     * <li>Ethernet with 2 possible modes : RTU over TCP/IP (PROTOCOL_CONNECTION_TYPE_ETHER_RTU) or real MODBUS-TCP/IP
+     * <li>Ethernet with 2 possible modes : RTU over TCP/IP
+     * (PROTOCOL_CONNECTION_TYPE_ETHER_RTU) or real MODBUS-TCP/IP
      * (PROTOCOL_CONNECTION_TYPE_ETHER_TCP).
      * <ul>
      * <p>
      * <h4>PROTOCOL_CONNECTION_TYPE_SERIAL</h4>
-     * see {@link org.eclipse.kura.comm.CommConnection CommConnection} package for more detail.
+     * see {@link org.eclipse.kura.comm.CommConnection CommConnection} package for
+     * more detail.
      * <table border="1">
      * <tr>
      * <th>Key</th>
@@ -159,8 +161,10 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
      * </tr>
      * <tr>
      * <td>connectionType</td>
-     * <td>"RS232" (from PROTOCOL_CONNECTION_TYPE_SERIAL). This parameter indicates the connection type for the
-     * configuration. See {@link org.eclipse.kura.comm.CommConnection CommConnection} for more details on serial port
+     * <td>"RS232" (from PROTOCOL_CONNECTION_TYPE_SERIAL). This parameter indicates
+     * the connection type for the
+     * configuration. See {@link org.eclipse.kura.comm.CommConnection
+     * CommConnection} for more details on serial port
      * configuration.
      * </tr>
      * <tr>
@@ -186,7 +190,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
      * </table>
      * <p>
      * <h4>PROTOCOL_CONNECTION_TYPE_ETHER_TCP</h4>
-     * The Ethernet mode merely opens a socket and sends the full RTU mode Modbus packet over that socket connection and
+     * The Ethernet mode merely opens a socket and sends the full RTU mode Modbus
+     * packet over that socket connection and
      * expects to receive a full RTU mode Modbus response, including the CRC bytes.
      * <table border="1">
      * <tr>
@@ -195,7 +200,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
      * </tr>
      * <tr>
      * <td>connectionType</td>
-     * <td>"ETHERTCP" (from PROTOCOL_CONNECTION_TYPE_ETHER_TCP). This parameter indicates the connection type for the
+     * <td>"ETHERTCP" (from PROTOCOL_CONNECTION_TYPE_ETHER_TCP). This parameter
+     * indicates the connection type for the
      * configurator.
      * </tr>
      * <tr>
@@ -352,7 +358,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
     }
 
     /**
-     * Installation of a serial connection to communicate, using javax.comm.SerialPort
+     * Installation of a serial connection to communicate, using
+     * javax.comm.SerialPort
      * <p>
      * <table border="1">
      * <tr>
@@ -384,7 +391,8 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
      * <td>only RTU mode supported, bitsPerWord must be 8</td>
      * </tr>
      * </table>
-     * see {@link org.eclipse.kura.comm.CommConnection CommConnection} package for more detail.
+     * see {@link org.eclipse.kura.comm.CommConnection CommConnection} package for
+     * more detail.
      */
     private final class SerialCommunicate extends Communicate {
 
@@ -422,7 +430,7 @@ public class ModbusProtocolDevice implements ModbusProtocolDeviceService {
                     .withDataBits(bits)
                     .withStopBits(stop)
                     .withParity(parity)
-                    .withTimeout(2000)
+                    .withOpenTimeout(2000)
                     .build()
                     .toString();
 
